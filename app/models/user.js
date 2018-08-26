@@ -5,7 +5,6 @@ module.exports = function (sequelize, Sequelize) {
 		id: { autoIncrement: true, primaryKey: true, type: Sequelize.INTEGER },
 		name: { type: Sequelize.STRING, notEmpty: true },
 		uuid: { type: Sequelize.UUID, notEmpty: true },
-		packet: { type: Sequelize.INTEGER, notEmpty: false },
 		status: { type: Sequelize.ENUM('active', 'inactive'), defaultValue: 'active' }
 
 	});

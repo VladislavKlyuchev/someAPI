@@ -8,25 +8,35 @@
     var env        = require('dotenv').load()
     var exphbs     = require('express-handlebars')
     var parser = new xml2js.Parser()
-
+    var cors = require('cors')
+    const path = require('path')
+    var sessionController = require('./app/controllers/sessioncontroller.js');
 
     //For BodyParser
     app.use(bodyParser.urlencoded({ extended: true }));
     app.use(bodyParser.json());
-
-
+    app.use(express.static(__dirname + '/app/views'));
+    app.use(function(req, res, next) {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        next();
+      });
      // For Passport
-    app.use(session({ secret: 'keyboard cat',resave: true, saveUninitialized:true})); // session secret
     app.use(passport.initialize());
-    app.use(passport.session()); // persistent login sessions
-
-
 	//Models
     var models = require("./app/models");
     app.use((req, res, next) => {
         req.db = models
         next()
     })  
+    app.use((req, res, next) => {
+        if (req.body && req.body.sessionId) {
+            sessionController(req, res, next)
+        } else {
+            next()
+        }
+       
+    })
     //Routes
     var authRoute = require('./app/routes/auth.js')(app,passport);
 
@@ -43,17 +53,9 @@
     console.log(err,"Something went wrong with the Database Update!")
     });
 
-     //For Handlebars
-    app.set('views', './app/views')
-    app.engine('hbs', exphbs({extname: '.hbs'}));
-    app.set('view engine', '.hbs');
     
-
     app.get('/', function(req, res){
-	  parser.parseString(fs.readFileSync('./xmltv.xml', {encoding: 'utf-8'}), (err,res) => {
-        console.log(JSON.stringify(res.tv.channel[0]['$']))
-    
-      })
+	res.sendFile(path.join(__dirname+ '/app/views/index.html'))
 	});
 
 
