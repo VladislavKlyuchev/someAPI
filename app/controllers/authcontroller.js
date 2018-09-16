@@ -8,7 +8,6 @@ exports.signup = function(req,res){
 }
 
 exports.signin = function(req,res){
-  console.log('Провера')
 	res.render('signin'); 
 
 }

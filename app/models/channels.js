@@ -7,6 +7,7 @@ module.exports = function (sequelize, Sequelize) {
 		channelNameEn: { type: Sequelize.STRING, notEmpty: true },
 		xmlTvId: { type: Sequelize.STRING, notEmpty: true },
 		logoPath: { type: Sequelize.STRING, notEmpty: true },
+		adult: {type: Sequelize.BOOLEAN, defaultValue: false},
 		streamPath: { type: Sequelize.STRING, notEmpty: true },
 		timeshift: { type: Sequelize.STRING, notEmpty: true },
 		hidden: { type: Sequelize.BOOLEAN }

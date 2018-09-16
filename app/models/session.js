@@ -8,7 +8,7 @@ module.exports = function (sequelize, Sequelize) {
 
 	});
 	Sessions.associate = function (models) {
-		models.sessions.belongsTo(models.user)
+		models.sessions.belongsTo(models.users)
 	};
 	return Sessions;
 

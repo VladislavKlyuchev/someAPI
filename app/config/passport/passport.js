@@ -89,7 +89,6 @@ module.exports = function (passport, user) {
   passport.use('local-signin', new customStrategy(
     function (req, done) {
       var User = user;
-      console.log(req.body)
       User.findOne({ where: { uuid: req.body.uuid } }).then(function (user) {
 
         if (!user) {
