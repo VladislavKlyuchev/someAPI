@@ -58,7 +58,7 @@ module.exports = function (app, passport) {
           where: { id: req.body.userId }
         })
         .then(result => {
-
+          console.log(result)
           res.statusCode = 200
           res.end()
 
@@ -69,8 +69,9 @@ module.exports = function (app, passport) {
         })
     }
   })
+  
   app.post('/changePackageOnAccount', isOperator, (req, res) => {
-    console.log('мы тут')
+
     if (!req.body.userId || !req.body.packageId) {
       res.statusCode = 400
       res.end()
@@ -120,6 +121,19 @@ module.exports = function (app, passport) {
       res.end()
     })
     }
+  })
+  // URL FOR OPERATOR API
+  app.post('/authOperator', isOperator, (req, res) => {
+    res.json({key: req.user.key})
+    res.end()
+  })
+  app.post('/operatorChannels', isOperator, (req, res) => {
+    req.db.packages.findAll({
+      where: {operatorId: req.user.id}
+    })
+    then(reslut => {
+
+    })
   })
   // URL FOR CLIENTS
   app.post('/getReleasedAppVersion', validSessionId, (req, res) => {
@@ -615,8 +629,14 @@ module.exports = function (app, passport) {
         where: { key: req.body.key }
       })
         .then(result => {
-          req.user = result
-          next()
+          if(result !== null) {
+            req.user = result
+            next()
+          } else {
+            res.statusCode = 403
+            res.end()
+          }
+         
         })
         .catch(err => {
           res.statusCode = 401
