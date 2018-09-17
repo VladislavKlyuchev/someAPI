@@ -15,31 +15,40 @@ module.exports = function (app, passport) {
     })
       .then((result) => {
         const body = result.map(el => {
-          return { id: el.id, name: el.name, price: el.price }
+          return { id: el.id, name: el.name, price: el.price, status: el.status }
         })
         res.statusCode = 200
-        res.json(body)
+        res.json(body.filter(el => el.status == true))
         res.end()
       })
   })
   app.post('/createAccount', isOperator, (req, res) => {
-    if (!req.body.packageId || !req.body.uuid || !req.body.pin || !req.body.status || !req.body.name) {
+    if (!req.body.packageId) {
       res.statusCode = 400
       res.end()
     } else {
       const newUser = {
-        uuid: req.body.uuid,
-        pin: req.body.pin,
-        name: req.body.name,
-        status: req.body.status,
+        uuid: req.body.uuid || null,
+        pin: req.body.pin || null,
+        name: req.body.name || null,
+        status: req.body.status || false,
         packageId: req.body.packageId,
         operatorId: req.user.id
       }
       req.db.users.create(newUser)
         .then((result) => {
-          res.statusCode = 200
-          res.json(result)
-          res.end()
+            req.db.historyPackages.create({
+              status: result.status,
+              userId: result.id,
+              packageId: result.packageId
+         
+            .then((r) => {
+              res.json(result)
+              res.end()
+            })
+          })
+
+        
         })
         .catch((err) => {
           res.statusCode = 400
@@ -111,10 +120,23 @@ module.exports = function (app, passport) {
         status: req.body.status
       },
     {
-      where: {id: req.body.userId}
+      where: {id: req.body.userId, operatorId: req.user.id}
     })
     .then(result => {
-      res.end()
+      req.db.users.findOne({
+        where: {id: req.body.userId}
+      })
+      .then(resultTwo => {
+        req.db.historyPackages.create({
+          status: resultTwo.status,
+          userId: resultTwo.id,
+          packageId: resultTwo.packageId
+        })
+        .then((r) => {
+          res.end()
+        })
+      })
+       
     })
     .catch(err => {
       res.statusCode = 400
@@ -124,16 +146,39 @@ module.exports = function (app, passport) {
   })
   // URL FOR OPERATOR API
   app.post('/authOperator', isOperator, (req, res) => {
-    res.json({key: req.user.key})
+    res.json(req.user)
     res.end()
   })
-  app.post('/operatorChannels', isOperator, (req, res) => {
-    req.db.packages.findAll({
-      where: {operatorId: req.user.id}
-    })
-    then(reslut => {
-
-    })
+  app.post('/operatorUpdateUser', isOperator, (req, res) => {
+    console.log(req.body)
+    if (!req.body.name || !req.body.pin || !req.body.packageId || !req.body.operatorId  || !req.body.uuid || !req.body.id) {
+      res.statusCode = 400
+      res.end()
+    } else {
+      if(req.body.operatorId != req.user.id) {
+        res.statusCode = 403
+        res.end()
+      } else {
+        const updateUser = {
+          name: req.body.name,
+          status: req.body.status,
+          uuid: req.body.uuid,
+          status: req.body.status,
+          id: req.body.id,
+          packageId: req.body.packageId,
+          operatorId: req.body.operatorId,
+          pin: req.body.pin,
+        }
+  
+        req.db.users.update(updateUser, { where: { id: updateUser.id } })
+          .then(() => {
+            res.statusCode = 201
+            res.end()
+          })
+  
+      }
+      
+    }
   })
   // URL FOR CLIENTS
   app.post('/getReleasedAppVersion', validSessionId, (req, res) => {
@@ -530,11 +575,17 @@ module.exports = function (app, passport) {
         operatorId: req.body.operatorId,
         pin: req.body.pin,
       }
-      console.log(newUser, 'мы тут!!!!')
       req.db.users.create(newUser)
-        .then(() => {
-          res.statusCode = 201
-          res.end()
+        .then((result) => {
+          req.db.historyPackages.create({
+            status: result.status,
+            packageId: result.packageId,
+            userId: result.id
+          })
+          .then(r => {
+            res.statusCode = 201
+            res.end()
+          })
         })
 
     }
@@ -542,7 +593,7 @@ module.exports = function (app, passport) {
   })
   app.post('/updateUser', isDashboard, (req, res) => {
 
-    if (!req.body.name || !req.body.pin || !req.body.packageId || !req.body.operatorId || !req.body.status || !req.body.uuid || !req.body.id) {
+    if (!req.body.name || !req.body.pin || !req.body.packageId || !req.body.operatorId ||  !req.body.uuid || !req.body.id) {
       res.statusCode = 400
       res.end()
     } else {
@@ -551,18 +602,77 @@ module.exports = function (app, passport) {
         status: req.body.status,
         uuid: req.body.uuid,
         status: req.body.status,
-        id: req.body.id,
         packageId: req.body.packageId,
         operatorId: req.body.operatorId,
         pin: req.body.pin,
       }
 
-      req.db.users.update(updateUser, { where: { id: updateUser.id } })
+      req.db.users.update(updateUser, { where: { id: req.body.id } })
         .then(() => {
-          res.statusCode = 201
-          res.end()
+          req.db.users.findOne({
+            where: {id: req.body.id}
+          })
+          .then(result => {
+            req.db.historyPackages.create({
+              status: result.status,
+              userId: result.id,
+              packageId: result.packageId
+          })
+          .then((r) => {
+            res.statusCode = 201
+            res.end()
+          })
         })
+      })
 
+    }
+  })
+  app.post('/updatePackage', isDashboard, (req, res) => {
+    if(!req.body.packageId || !req.body.price || !req.body.name ) {
+      res.statusCode = 400
+      res.end()
+    } else {
+      const package = {
+        id: req.body.packageId,
+        price: req.body.price,
+        name: req.body.name,
+        status: req.body.status
+      }
+      req.db.packages.update(package, {
+        where: {id: req.body.packageId}
+      })
+      .then(() => {
+        req.db.packages.findAll()
+        .then(packages => {
+          req.db.users.findAll({where: {packageId: null}})
+          .then(users => {
+            const newUsers = users.map(el => {
+              let body = {
+                id: el.id,
+                name: el.name,
+                uuid: el.uuid,
+                pin: el.pin,
+                status: el.status,
+                operatorId: el.operatorId,
+                packageId: packages.find(p => el.operatorId == p.operatorId).id
+              }
+              return body
+            })
+            req.db.users.bulkCreate(newUsers, {
+              updateOnDuplicate: ['packageId']
+            })
+            .then(g => {
+              const history = newUsers.map(el => {
+                return {
+
+                }
+            })
+              req.db.historyPackages.bulkCreate()
+              res.end()
+            })
+          })
+        })
+      })
     }
   })
   app.get('/dashboard', isLoggedIn, authController.dashboard)
@@ -612,7 +722,6 @@ module.exports = function (app, passport) {
     }
   }
   function isDashboard(req, res, next) {
-    console.log(req.body)
     if (!req.body.dashboard || req.body.dashboard != 123321) {
       res.statusCode = 401
       res.end()

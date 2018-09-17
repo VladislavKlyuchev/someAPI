@@ -22,8 +22,23 @@ function sessionController(req, res, next) {
                     }
                 }
             ).then(() => {
-                req.userSession = session
-                next()
+                req.db.users.findOne({
+                    where: {id: session.userid}
+                })
+                .then(result => {
+                    req.operators.findOne({
+                        where: {id: result.operatorId}
+                    })
+                    .then(operator => {
+                        if(operator.status && result.status) {
+                            req.userSession = session
+                            next()
+                        } else {
+                            res.statusCode = 403
+                            res.end()
+                        }
+                    })
+                })
             })
 
         }

@@ -6,7 +6,7 @@ module.exports = function (sequelize, Sequelize) {
 		name: { type: Sequelize.STRING, notEmpty: true },
 		uuid: { type: Sequelize.UUID, notEmpty: true },
 		pin: { type: Sequelize.STRING, notEmpty: true },
-		status: { type: Sequelize.BOOLEAN, defaultValue: true }
+		status: { type: Sequelize.BOOLEAN, defaultValue: false }
 		
 	});
 	return Users;
