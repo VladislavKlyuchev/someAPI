@@ -641,7 +641,7 @@ module.exports = function(app, passport) {
 			!req.body.pin ||
 			!req.body.packageId ||
 			!req.body.operatorId ||
-			req.body.status !== undefined ||
+			req.body.status == undefined ||
 			!req.body.uuid
 		) {
 			console.log(req.body)
