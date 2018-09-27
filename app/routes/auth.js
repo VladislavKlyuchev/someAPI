@@ -635,6 +635,7 @@ module.exports = function(app, passport) {
 		});
 	});
 	app.post('/createNewUser', isDashboard, (req, res) => {
+
 		if (
 			!req.body.name ||
 			!req.body.pin ||
@@ -643,6 +644,7 @@ module.exports = function(app, passport) {
 			req.body.status !== undefined ||
 			!req.body.uuid
 		) {
+			console.log(req.body)
 			res.statusCode = 400;
 			res.end();
 		} else {
