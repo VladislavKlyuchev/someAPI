@@ -640,7 +640,7 @@ module.exports = function(app, passport) {
 			!req.body.pin ||
 			!req.body.packageId ||
 			!req.body.operatorId ||
-			!req.body.status ||
+			req.body.status !== undefined ||
 			!req.body.uuid
 		) {
 			res.statusCode = 400;
