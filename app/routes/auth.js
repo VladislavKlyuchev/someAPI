@@ -96,11 +96,12 @@ module.exports = function(app, passport) {
 					where: { userId: usersId }
 				})
 				.then(history => {
-					const formatterHistory = history.map(h => {
+					const formatterHistory = history.map((h, i, arr) => {
+						const endTime = arr[i + 1] ? arr[i + 1].updatedAt : new Date();
 						return {
 							userId: h.userId,
 							createdAt: moment(h.createdAt).format('YYYY-MM-DD HH:mm'),
-							updatedAt: moment(h.updatedAt).format('YYYY-MM-DD HH:mm'),
+							updatedAt: moment(endTime).format('YYYY-MM-DD HH:mm'),
 							status: h.status,
 							packageId: h.packageId
 						};
@@ -517,7 +518,6 @@ module.exports = function(app, passport) {
 			res.statusCode = 400;
 			res.end();
 		} else {
-			console.log(req.body.channels);
 			req.body.channels.forEach(async el => {
 				await req.db.chPackages.update(
 					{ order: el.order },
