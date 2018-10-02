@@ -55,10 +55,7 @@ models.sequelize
 	.sync()
 	.then(function() {
 		console.log('Nice! Database looks fine');
-		app.listen(5000, function(err) {
-			if (!err) console.log('Site is live');
-			else console.log(err);
-		});
+		
 	})
 	.catch(function(err) {
 		console.log(err, 'Something went wrong with the Database Update!');
@@ -69,4 +66,8 @@ app.get('/', function(req, res) {
 });
 app.get('/admin', function(req, res) {
 	res.sendFile(path.join(__dirname + '/app/views/admin/index.html'));
+});
+app.listen(5000, function(err) {
+	if (!err) console.log('Site is live');
+	else console.log(err);
 });
