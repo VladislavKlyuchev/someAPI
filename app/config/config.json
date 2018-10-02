@@ -1,13 +1,8 @@
 {
 	"development": {
 		"username": "root",
-<<<<<<< HEAD
-		"password": "qwerty",
-		"database": "test",
-=======
 		"password": "tvgpasswd55",
 		"database": "API",
->>>>>>> 1b19a06bddb55c45fed22656adc7519778a2f6cb
 		"host": "127.0.0.1",
 		"dialect": "mysql"
 	},
