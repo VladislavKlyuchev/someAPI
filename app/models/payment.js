@@ -1,3 +1,4 @@
+/*
 module.exports = function(sequelize, Sequelize) {
 	var payments = sequelize.define('payments', {
 		id: { autoIncrement: true, primaryKey: true, type: Sequelize.INTEGER },
@@ -8,3 +9,5 @@ module.exports = function(sequelize, Sequelize) {
 	};
 	return payments;
 };
+
+*/
