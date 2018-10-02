@@ -74,7 +74,7 @@ module.exports = function(app, passport) {
 						uuid: req.body.uuid
 					},
 					{
-						where: { id: req.body.userId }
+						where: { id: req.body.userId, operatorId: req.user.id }
 					}
 				)
 				.then(result => {
@@ -122,7 +122,7 @@ module.exports = function(app, passport) {
 						packageId: req.body.packageId
 					},
 					{
-						where: { id: req.body.userId },
+						where: { id: req.body.userId, operatorId: req.user.id },
 						returning: true,
 						plain: true
 					}
@@ -211,7 +211,6 @@ module.exports = function(app, passport) {
 			});
 	});
 	app.post('/operatorUpdateUser', isOperator, (req, res) => {
-		console.log(req.body);
 		if (
 			(!req.body.name ||
 				!req.body.pin ||
@@ -240,7 +239,9 @@ module.exports = function(app, passport) {
 				};
 
 				req.db.users
-					.update(updateUser, { where: { id: updateUser.id } })
+					.update(updateUser, {
+						where: { id: updateUser.id, operatorId: req.user.id }
+					})
 					.then(() => {
 						req.db.historyPackages
 							.create({
@@ -249,6 +250,7 @@ module.exports = function(app, passport) {
 								packageId: updateUser.packageId
 							})
 							.then(r => {
+								res.statusCode = 405;
 								res.end();
 							});
 					});
@@ -272,7 +274,6 @@ module.exports = function(app, passport) {
 		req.db.users
 			.findOne({ where: { id: req.userSession.userId } })
 			.then(user => {
-				console.log(user);
 				if (user.status != 0) {
 					req.db.chPackages
 						.findAll({
@@ -635,15 +636,15 @@ module.exports = function(app, passport) {
 		});
 	});
 	app.post('/createNewUser', isDashboard, (req, res) => {
-
 		if (
 			!req.body.name ||
 			!req.body.pin ||
 			!req.body.packageId ||
 			!req.body.operatorId ||
+			req.body.status == undefined ||
 			!req.body.uuid
 		) {
-			console.log(req.body)
+			console.log(req.body);
 			res.statusCode = 400;
 			res.end();
 		} else {
