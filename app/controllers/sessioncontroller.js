@@ -26,6 +26,7 @@ function sessionController(req, res, next) {
                     where: {id: session.userid}
                 })
                 .then(result => {
+                    console.log('result')
                     console.log('result ', result)
                     req.operators.findOne({
                         where: {id: result.operatorId}
