@@ -816,6 +816,7 @@ module.exports = function(app, passport) {
 			res.statusCode = 401;
 			res.end();
 		} else {
+			console.log('sessions: ', req.db.sessions)
 			req.db.sessions
 				.findOne({ where: { key: req.body.sessionId } })
 				.then(ok => {
