@@ -23,7 +23,7 @@ function sessionController(req, res, next) {
                 }
             ).then(() => {
                 req.db.users.findOne({
-                    where: {id: session.userid}
+                    where: {id: session.userId}
                 })
                 .then(result => {
                     console.log('result')
