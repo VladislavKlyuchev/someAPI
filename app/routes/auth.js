@@ -290,6 +290,10 @@ module.exports = function(app, passport, env) {
 			
 		}
 	});
+	console.log(process.env.V)
+	console.log(process.env.V)
+	console.log(process.env.V)
+	console.log(process.env.V)
 	app.post(`/v${process.env.V}/session/:sessionId/update`, validSessionId, async (req, res) => {
 		const session = req.userSession;
 		try {
