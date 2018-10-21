@@ -279,7 +279,7 @@ module.exports = function(app, passport, env) {
 				}
 				const resultObject = {
 					"version": result.version,
-					"apkUrl": result.url
+					"apkUrl": result.apkUrl
 				}
 				res.json(resultObject)
 				res.end();
