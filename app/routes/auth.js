@@ -4,7 +4,7 @@ const path = require('path');
 const xmlParser = require('xml2js').parseString;
 const moment = require('moment');
 
-module.exports = function(app, passport) {
+module.exports = function(app, passport, env) {
 	app.get('/signup', authController.signup);
 
 	app.get('/signin', authController.signin);
@@ -40,6 +40,8 @@ module.exports = function(app, passport) {
 				pin: req.body.pin || null,
 				name: req.body.name || null,
 				status: req.body.status || false,
+				version: req.body.version || null,
+				apkUrl: req.body.apkUrl || null,
 				packageId: req.body.packageId,
 				operatorId: req.user.id
 			};
@@ -217,6 +219,8 @@ module.exports = function(app, passport) {
 				!req.body.packageId ||
 				!req.body.operatorId ||
 				!req.body.uuid ||
+				!req.body.version || 
+				!req.body.apkUrl ||
 				!req.body.id,
 			req.body.status == 'undefined')
 		) {
@@ -233,6 +237,8 @@ module.exports = function(app, passport) {
 					uuid: req.body.uuid,
 					status: req.body.status,
 					id: req.body.id,
+					version: req.body.version,
+					apkUrl: req.body.apkUrl,
 					packageId: req.body.packageId,
 					operatorId: req.body.operatorId,
 					pin: req.body.pin
@@ -250,7 +256,7 @@ module.exports = function(app, passport) {
 								packageId: updateUser.packageId
 							})
 							.then(r => {
-								res.statusCode = 405;
+								res.statusCode = 200;
 								res.end();
 							});
 					});
@@ -258,112 +264,86 @@ module.exports = function(app, passport) {
 		}
 	});
 	// URL FOR CLIENTS
-	app.post('/getReleasedAppVersion', validSessionId, (req, res) => {
-		res.json({ version: 'v0.0.1' });
-		res.end();
-	});
-	app.post('/updateSession', validSessionId, (req, res) => {
-		res.json({ result: 'Session update!' });
-		res.end();
-	});
-	app.post('/getAppPackage', validSessionId, (req, res) => {
-		res.json({ url: '/path/to/apk/file' });
-		res.end();
-	});
-	app.post('/listChannels', validSessionId, (req, res) => {
-		req.db.users
-			.findOne({ where: { id: req.userSession.userId } })
-			.then(user => {
-				if (user.status != 0) {
-					req.db.chPackages
-						.findAll({
-							where: { packageId: user.packageId },
-							include: [
-								{
-									model: req.db.channels,
-									attributes: [
-										'channelId',
-										'channelName',
-										'logoPath',
-										'streamPath',
-										'timeshift',
-										'hidden'
-									]
-								}
-							],
-							order: ['order'],
-							attributes: []
-						})
-						.then(channels => {
-							res.statusCode = 200;
-
-							res.json(
-								channels.map(el => {
-									return el.channel;
-								})
-							);
-							res.end();
-						});
-				} else {
-					(res.statusCode = 403), res.end();
+	app.get(`/v${process.env.V}/android-app`,async (req, res) => {
+		const stbId = req.query.stbId;
+		if(!stbId) {
+			res.statusCode = 400
+			res.end()
+		} else {
+			let result;
+			try {
+				result = await req.db.users.findOne({where: {uuid: stbId}});
+				if(result == null ) {
+					res.statusCode = 404
+					res.end();
 				}
-			});
+				const resultObject = {
+					"version": result.version,
+					"apkUrl": result.url
+				}
+				res.json(resultObject)
+				res.end();
+			} catch(err) {
+				res.statusCode = 500
+				res.end()
+			}
+			
+		}
 	});
-	app.post('/listEpg', validSessionId, (req, res) => {
-		if (!req.body.sessionId) {
-			res.statusCode = 401;
+	app.post(`/v${process.env.V}/session/:sessionId/update`, validSessionId, async (req, res) => {
+		const session = req.userSession;
+		try {
+			const result = await req.db.sessions.update({lastVisit: moment(new Date).format('YYYY-MM-DD HH:mm'),},{where: {key: session.key}});
 			res.end();
-		} else if (
-			!req.body.sessionId ||
-			!req.body.channelId ||
-			!req.body.fromDate ||
-			!req.body.toDate
-		) {
-			res.statusCode = 400;
+		} catch(err) {
+			res.statusCode = 409;
+			res.end();
+		}
+	});
+
+	app.get(`/v${process.env.V}/channel`, validSessionId, async (req, res) => {
+		const {user} = req
+		if(user.status == 0 ) {
+			res.statusCode = 403;
 			res.end();
 		} else {
-			function formatterDate(date) {
-				return new Date(+date.split(' ')[0]);
+			try {
+				const channels = await req.db.chPackages.findAll({where: {packageId: user.packageId}, 
+				include: [
+					{
+						model: req.db.channels
+
+					}
+				],
+				order: ['order'],
+				attributes: []
+				})
+				const categories = await req.db.category.findAll();
+
+				const formattedChannels = channels.map(ch => {
+					let channel = ch.channel;
+
+					let result = {
+						lid: channel.channelId,
+						name:channel.channelName,
+						mediaUrl: channel.streamPath,
+						recordingMediaUrl: channel.recordingMediaUrl,
+						recorderHours: channel.timeshift,
+						logoUrl: channel.logoPath,
+						category: categories.find(cat => cat.id == channel.categoryId).key
+					}
+					return result
+				})
+				res.json(formattedChannels);
+				res.end();
+			} catch(err) {
+				console.log(err)
 			}
-			console.log(path.basename(process.env.filePath + '/xmltv.xml'));
-			const xml = fs.readFile(
-				process.env.filePath + '/xmltv.xml',
-				'utf8',
-				(err, result) => {
-					xmlParser(result, (err, data) => {
-						if (err) {
-							res.statusCode = 400;
-							res.end();
-						} else {
-							const programm = data.tv.programme;
-							const programme = programm.map(el => {
-								return {
-									channelId: el.$.channel,
-									start: el.$.start,
-									stop: el.$.stop,
-									title: el.title[0]._,
-									category: el.category ? el.category[0]._ : null
-								};
-							});
-							const result = programme.filter(el => {
-								if (
-									el.channelId == req.body.channelId &&
-									moment(formatterDate(el.start)) >=
-										moment(formatterDate(req.body.fromDate)) &&
-									moment(formatterDate(el.stop)) <=
-										moment(formatterDate(req.body.toDate))
-								) {
-									return el;
-								}
-							});
-							res.statusCode = 200;
-							res.json({ programme: result });
-							res.end();
-						}
-					});
-				}
-			);
 		}
+		
+	});
+	app.get(`/v${process.env.V}/channel/:channelKey/epg`, validSessionId, (req, res) => {
+		res.json([])
 	});
 	app.post('/allChannels', isDashboard, (req, res) => {
 		req.db.channels.findAll().then(channels => {
@@ -427,6 +407,7 @@ module.exports = function(app, passport) {
 			channelNameEn: req.body.channelNameENG,
 			xmlTvId: req.body.xmlTvId,
 			adult: req.body.adult,
+			recordingMediaUrl: req.body.recordingMediaUrl,
 			logoPath: req.body.logoPath,
 			streamPath: req.body.streamPath,
 			timeshift: req.body.timeshift,
@@ -447,6 +428,7 @@ module.exports = function(app, passport) {
 			xmlTvId: req.body.xmlTvId,
 			adult: req.body.adult,
 			logoPath: req.body.logoPath,
+			recordingMediaUrl: req.body.recordingMediaUrl,
 			streamPath: req.body.streamPath,
 			timeshift: req.body.timeshift,
 			hidden: req.body.hidden,
@@ -537,12 +519,13 @@ module.exports = function(app, passport) {
 		});
 	});
 	app.post('/addNewCategory', isDashboard, (req, res) => {
-		if (!req.body.name) {
+		if (!req.body.name || !req.body.key) {
 			res.statusCode = 400;
 			res.end();
 		} else {
 			const newCategory = {
-				name: req.body.name
+				name: req.body.name,
+				key: req.body.key
 			};
 			req.db.category
 				.create(newCategory)
@@ -640,6 +623,8 @@ module.exports = function(app, passport) {
 			!req.body.name ||
 			!req.body.pin ||
 			!req.body.packageId ||
+			!req.body.version || 
+			!req.body.apkUrl ||
 			!req.body.operatorId ||
 			req.body.status == undefined ||
 			!req.body.uuid
@@ -652,6 +637,8 @@ module.exports = function(app, passport) {
 				name: req.body.name,
 				status: req.body.status,
 				uuid: req.body.uuid,
+				version: req.body.version,
+				apkUrl: req.body.apkUrl,
 				packageId: req.body.packageId,
 				operatorId: req.body.operatorId,
 				pin: req.body.pin
@@ -675,6 +662,8 @@ module.exports = function(app, passport) {
 			!req.body.name ||
 			!req.body.pin ||
 			!req.body.packageId ||
+			!req.body.version ||
+			!req.body.apkUrl ||
 			!req.body.operatorId ||
 			!req.body.uuid ||
 			!req.body.id
@@ -686,6 +675,8 @@ module.exports = function(app, passport) {
 				name: req.body.name,
 				status: req.body.status,
 				uuid: req.body.uuid,
+				version: req.body.version,
+				apkUrl: req.body.apkUrl,
 				status: req.body.status,
 				packageId: req.body.packageId,
 				operatorId: req.body.operatorId,
@@ -787,48 +778,84 @@ module.exports = function(app, passport) {
 			res.end();
 		}
 	});
-	app.post('/auth', passport.authenticate('local-signin'), (req, res, test) => {
-		req.db.sessions.findOne({ where: { userId: req.user.id } }).then(user => {
-			if (user) {
-				res.statusCode = 200;
-				res.json({ sessionId: user.key });
-				res.end();
-			} else {
-				var newSession = {
-					userId: req.user.id,
-					lastVisit: moment(new Date()).format('YYYY-MM-DD HH:mm')
-				};
-				req.db.sessions.create(newSession).then((newUser, created) => {
-					if (!newUser) {
-						res.statusCode = 400;
-						res.end();
-					} else {
-						res.statusCode = 201;
-						res.json({ sessionId: newUser.key });
-						res.end();
-					}
-				});
-			}
-		});
-	});
-	function validSessionId(req, res, next) {
-		if (!req.body.sessionId) {
-			res.statusCode = 401;
-			res.end();
+	app.post(`/v${process.env.V}/session`, async (req, res ) => {
+		const stbId = req.body.stbId;
+		if(!stbId) {
+			res.statusCode = 400;
+			res.end()
 		} else {
-			console.log('sessions: ', req.db.sessions)
-			req.db.sessions
-				.findOne({ where: { key: req.body.sessionId } })
-				.then(ok => {
-					if (!ok) {
-						res.statusCode = 401;
+			let user;
+			try {
+				user = await req.db.users.findOne({where: {uuid: stbId}});
+				if(user == null) {
+					res.statusCode = 404;
+					res.end()
+				} else {
+					const session = {
+					userId: user.id,
+					lastVisit: moment(new Date()).format('YYYY-MM-DD HH:mm')
+				}
+				const setSession = await req.db.sessions.create(session);
+				if(setSession == null) {
+					res.statusCode = 500;
+					res.end()
+				} else {
+					res.statusCode = 201;
+					res.json({sessionId: setSession.key})
+					res.end();
+				}
+				}
+				
+			} catch(err) {
+				console.error(err)
+				res.statusCode =  409;
+				res.end()
+			}
+		}
+	});
+	async function validSessionId(req, res, next) {
+		const sessionId = req.params.sessionId || req.query.sessionId || req.body.sessionId;
+		if(!sessionId ) {
+			res.statusCode = 401;
+			res.end;
+		} else {
+			try {
+				let session = await req.db.sessions.findOne({where: { key: sessionId}});
+				if(session == null ) {
+					res.statusCode = 401;
+					res.end();
+				} else if(moment(new Date()).format('YYYY-MM-DD HH:mm') > moment(session.lastVisit).add(50, 'minutes').format('YYYY-MM-DD HH:mm')) {
+					const destroy = await req.db.sessions.destroy({where: {id: session.id}})
+					res.statusCode = 524;
+					res.end();
+				} else { 
+					const update = await req.db.sessions.update({lastVisit: moment(new Date).format('YYYY-MM-DD HH:mm')}, {where: {key: session.key}});
+					const user = await req.db.users.findOne({where:{id: session.userId}});
+					if(user == null) {
+						await req.db.sessions.destroy({where: {id: session.id}})
+						res.statusCode = 409;
 						res.end();
 					} else {
-						next();
+						req.user = user
+						const operator = await req.db.operators.findOne({where:{id: user.operatorId}});
+						if(operator == null ) {
+							res.statusCode = 409;
+							res.json({err: "User operator not found"});
+							res.end()
+						} else {
+							if(user.status && operator.status) {
+								req.userSession = session
+                           		 next()
+							} else {
+								res.statusCode = 403
+								res.end();
+							}
+						}
 					}
-				})
-				.catch(err => res.redirect('/logout'));
+				}
+			} catch(err) {}
 		}
+		//				.catch(err => res.redirect('/logout'));
 	}
 	function isDashboard(req, res, next) {
 		if (

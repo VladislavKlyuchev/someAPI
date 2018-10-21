@@ -6,7 +6,9 @@ module.exports = function (sequelize, Sequelize) {
 		name: { type: Sequelize.STRING, notEmpty: true },
 		uuid: { type: Sequelize.UUID, notEmpty: true },
 		pin: { type: Sequelize.STRING, notEmpty: true },
-		status: { type: Sequelize.BOOLEAN, defaultValue: false }
+		status: { type: Sequelize.BOOLEAN, defaultValue: false },
+		version: { type: Sequelize.STRING, notEmpty: true},
+		apkUrl: { type: Sequelize.STRING, notEmpty: true}
 		
 	});
 	return Users;

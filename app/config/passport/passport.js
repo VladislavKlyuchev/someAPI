@@ -87,10 +87,11 @@ module.exports = function (passport, user) {
 
   //LOCAL SIGNIN
   passport.use('local-signin', new customStrategy(
-    function (req, done) {
+    function (req, done, test) {
       var User = user;
-      User.findOne({ where: { uuid: req.body.uuid } }).then(function (user) {
-
+      console.log('Мы тут!!!!!121')
+      User.findOne({ where: { uuid: req.body.stbId } }).then(function (user) {
+        console.log('user', user)
         if (!user) {
           return done(null, false, { message: 'Email does not exist' });
         } 
