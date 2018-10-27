@@ -16,7 +16,6 @@ module.exports = function (sequelize, Sequelize) {
     Operators.associate = function (models) {
         models.users.belongsTo(models.operators)
         models.historyPackages.belongsTo(models.users)
-		
 	};
     return Operators;
 

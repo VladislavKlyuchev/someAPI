@@ -8,6 +8,7 @@ var xml2js = require('xml2js');
 var env = require('dotenv').load();
 var parser = new xml2js.Parser();
 var cors = require('cors');
+var invoice = require('./functions/invoice')
 const path = require('path');
 var sessionController = require('./app/controllers/sessioncontroller.js');
 var cron = require('node-cron');
@@ -45,11 +46,15 @@ var authRoute = require('./app/routes/auth.js')(app, passport, env);
 require('./app/config/passport/passport.js')(passport, models.users);
 
 // invoice operators
-/*
+
 cron.schedule('05 0 * * *', () => {
+    try{
+        invoice(models)
+    } catch(err) {
+        console.log(err)
+    }
 	
 })
-*/
 //Sync Database
 models.sequelize
 	.sync()

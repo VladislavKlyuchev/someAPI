@@ -4,197 +4,237 @@ const path = require('path');
 const xmlParser = require('xml2js').parseString;
 const moment = require('moment');
 
+async function updateUserHistory(db, user) {
+	try {
+		const formatted = {
+			status: user.status,
+			userId: user.id,
+			packageId: user.packageId
+		}
+		const result = await db.create(formatted);
+	} catch(err) {
+		console.error(err)
+		throw new Error(err);
+	}
+	
+
+}
 module.exports = function(app, passport, env) {
 	app.get('/signup', authController.signup);
 
 	app.get('/signin', authController.signin);
 	// URL FOR OPERATORS API
-	app.post('/listPackagesWithPrices', isOperator, (req, res) => {
-		req.db.packages
-			.findAll({
-				where: {
-					operatorId: req.user.id,
-					status: 1
-				}
-			})
-			.then(result => {
-				const body = result.map(el => {
+	app.get(`/billing-api/v${process.env.B}/:operatorId/package`, isOperator, async (req, res) => {
+		try {
+			const packages = await req.db.packages.findAll({where: {operatorId: req.user.id, status: 1}})
+			if(packages == null ) {
+				res.json([])
+				res.end();
+			} else {
+				const formattedPackages = packages.map(el => {
 					return {
 						id: el.id,
 						name: el.name,
 						price: el.price
-					};
-				});
-				res.statusCode = 200;
-				res.json(body);
-				res.end();
-			});
+					}
+				})
+				res.json(formattedPackages)
+				res.end()
+			}
+		} catch(err) {
+			console.error(err)
+			res.statusCode = 409;
+			res.end();
+		}
+		
 	});
-	app.post('/createAccount', isOperator, (req, res) => {
+	app.post(`/billing-api/v${process.env.B}/:operatorId/account`, isOperator, async (req, res) => {
 		if (!req.body.packageId) {
 			res.statusCode = 400;
 			res.end();
 		} else {
-			const newUser = {
-				uuid: req.body.uuid || null,
-				pin: req.body.pin || null,
-				name: req.body.name || null,
-				status: req.body.status || false,
-				version: req.body.version || null,
-				apkUrl: req.body.apkUrl || null,
-				packageId: req.body.packageId,
-				operatorId: req.user.id
-			};
-			req.db.users
-				.create(newUser)
-				.then(result => {
-					req.db.historyPackages
-						.create({
-							status: newUser.status,
-							userId: newUser.id,
-							packageId: newUser.packageId
-						})
-						.then(r => {
-							res.json(result);
-							res.end();
-						});
-				})
-				.catch(err => {
-					res.statusCode = 400;
+			try {
+				const packageId = req.body.packageId
+				const package = await req.db.packages.findOne({where: {operatorId: req.user.id, id: packageId}});
+				if(package == null) {
+					res.statusCode = 403;
 					res.end();
-				});
+				}  else {
+	
+					const user = {
+						packageId: req.body.packageId,
+						operatorId: req.user.id
+					};
+					const newUser = await req.db.users.create(user);
+					await updateUserHistory(req.db.historyPackages, newUser);
+					const result = newUser.get('id');
+					res.json({accountId: result});
+					res.end()
+				}
+			} catch(err) {
+				console.log(err)
+				res.statusCode = 409;
+				res.end();
+			}
+			
+	
+		
+		
 		}
 	});
-	app.post('/AttachSTBOnAccount', isOperator, (req, res) => {
-		if (!req.body.userId || !req.body.uuid) {
+	console.log(`billing-api/v${process.env.B}/:operatorId/account/:accountId`)
+	app.put(`/billing-api/v${process.env.B}/:operatorId/account/:accountId`, isOperator, async (req, res) => {
+		const {status, stbId, packageId} =  req.body;
+		const accountId = req.params.accountId
+		console.log('accountId', accountId)
+		if (!status || !stbId || !packageId) {
 			res.statusCode = 400;
 			res.end();
 		} else {
-			req.db.users
-				.update(
-					{
-						uuid: req.body.uuid
-					},
-					{
-						where: { id: req.body.userId, operatorId: req.user.id }
+			try {
+				const package = await req.db.packages.findOne({where: {operatorId: req.user.id, id: packageId}});
+				if(package == null) {
+					res.statusCode = 403;
+					res.end();
+				}  else {
+					const update = await req.db.users.update({uuid: stbId, packageId: packageId, status: (status == "active"? 1: 0)},
+					{where:{ operatorId: req.user.id, id: accountId}});
+					const user = {
+						id: accountId,
+						packageId: packageId,
+						status: (status == "active"? 1: 0)
 					}
-				)
-				.then(result => {
-					console.log(result);
-					res.statusCode = 200;
-					res.end();
-				})
-				.catch(err => {
-					res.statusCode = 400;
-					res.end();
-				});
+					await updateUserHistory(req.db.historyPackages, user)
+					res.end()
+				}
+			} catch(err) {
+				console.log(err)
+				res.statusCode = 409;
+				res.end()
+			}
 		}
 	});
-	app.post('/userHistory', isOperator, (req, res) => {
-		req.db.users.findAll({ where: { operatorId: req.user.id } }).then(users => {
-			const usersId = users.map(el => el.id);
-			req.db.historyPackages
-				.findAll({
-					where: { userId: usersId }
-				})
-				.then(history => {
-					const formatterHistory = history.map((h, i, arr) => {
-						const endTime = arr[i + 1] ? arr[i + 1].updatedAt : new Date();
+	app.get(`/billing-api/v${process.env.B}/:operatorId/account`, isOperator, async (req, res) => {
+		let {from, size} = req.query;
+		console.log('from', from)
+		console.log('size', size)
+		if(!from && from !== 0 || !size) {
+			res.statusCode = 400;
+			res.end()
+		} else {
+			try {
+				const users = await req.db.users.findAll({where: {operatorId: req.user.id}});
+				if(users == null) {
+					res.json([])
+					res.end();
+				} else {
+					const usersSlice = users.slice(from).filter((u, i) => (i <= size)? true : false);
+					const usersFormatted = usersSlice.map(u => {
 						return {
-							userId: h.userId,
-							createdAt: moment(h.createdAt).format('YYYY-MM-DD HH:mm'),
-							updatedAt: moment(endTime).format('YYYY-MM-DD HH:mm'),
-							status: h.status,
-							packageId: h.packageId
-						};
-					});
-					res.json(formatterHistory);
+							id: u.id,
+							stbId: u.uuid,
+							pin: u.pin,
+							status: u.status == 1? "active" : "inactive"
+						}
+					})
+
+					res.json(usersFormatted);
 					res.end();
-				});
-		});
-	});
-	app.post('/changePackageOnAccount', isOperator, (req, res) => {
-		if (!req.body.userId || !req.body.packageId) {
+				}
+			} catch(err) {
+				console.log(err)
+				res.statusCode = 409;
+				res.end()
+			}
+		}
+
+	})
+	app.get(`/billing-api/v${process.env.B}/<operatorId>/amount-to-pay`, isOperator, async (req, res) => {
+		const {dateFrom, dateTo} = req.query;
+		if(!dateFrom, !dateTo)  {
 			res.statusCode = 400;
 			res.end();
 		} else {
-			req.db.users
-				.update(
-					{
-						packageId: req.body.packageId
-					},
-					{
-						where: { id: req.body.userId, operatorId: req.user.id },
-						returning: true,
-						plain: true
-					}
-				)
-				.then(result => {
-					req.db.users
-						.findOne({
-							where: { id: req.body.userId }
+			try {
+				const payments = await req.db.payments.findAll({where: {operatorId: req.user.id, $between: [dateFrom,dateTo]}});
+				if(payments !== null) {
+					let amount;
+					if(payments.length > 1 ) {
+						amount = payments.reduce((acc, value, i) => {
+							return (i == 1)? acc.price + value.price : acc + value.price
 						})
-						.then(user => {
-							console.log(user);
-							req.db.historyPackages
-								.create({
-									packageId: user.packageId,
-									userId: user.id,
-									status: user.status
-								})
-								.then(resultTwo => {
-									res.statusCode = 200;
-									res.end();
-								})
-								.catch(err => {
-									res.statusCode = 405;
-									res.end();
-								});
-						});
-				})
-				.catch(err => {
-					res.statusCode = 405;
+					} else if (payments.length == 1) {
+						amount = payments[0].price
+					} 
+					res.json({amount});
 					res.end();
-				});
+				} else {
+					res.json({amount: 0});
+					res.end();
+				}
+			} catch (error) {
+				console.log(error)
+				res.statusCode = 409;
+				res.end();
+			}
 		}
-	});
-	app.post('/changeUserStatus', isOperator, (req, res) => {
-		if (!req.body.userId) {
+	})
+	app.get(`/billing-api/v${process.env.B}/:operatorId/account/history`, isOperator, async (req,res) => {
+		
+		const {dateFrom, dateTo} = req.query;
+		if(!dateFrom, !dateTo)  {
 			res.statusCode = 400;
 			res.end();
 		} else {
-			req.db.users
-				.update(
-					{
-						status: req.body.status
-					},
-					{
-						where: { id: req.body.userId, operatorId: req.user.id }
+			try {
+				const usersHistory = await req.db.historyPackages.findAll({where: { createdAt: {$between: [dateFrom, dateTo]}}})
+				const users = await  req.db.users.findAll();
+				let usersFormatted = usersHistory.map(h => {
+					return {
+						id: h.userId,
+						date:h.createdAt,
+						status: h.status == 1? "active" : "inactive",
+						packageId: h.packageId,
+						stbId: users.find(u => u.id == h.userId).uuid 
 					}
-				)
-				.then(result => {
-					req.db.users
-						.findOne({
-							where: { id: req.body.userId }
-						})
-						.then(resultTwo => {
-							req.db.historyPackages
-								.create({
-									status: resultTwo.status,
-									userId: resultTwo.id,
-									packageId: resultTwo.packageId
-								})
-								.then(r => {
-									res.end();
-								});
-						});
 				})
-				.catch(err => {
-					res.statusCode = 400;
-					res.end();
-				});
+				
+				// Добавить статус им, и сделать юзеров сюда еще и выборку
+				res.json(usersFormatted)
+				res.end();
+			} catch(err) { 
+				console.log(err)
+				res.statusCode = 409;
+				res.end();
+			}
 		}
-	});
+	})
+	app.get(`/billing-api/v${process.env.B}/:operatorId/account/:accountId`, isOperator, async (req,res) => {
+		const {accountId} = req.params;
+		if(!accountId  && accountId !== 0) {
+			res.statusCode = 400;
+			res.end();
+		} else {
+			try {
+				const user = await req.db.users.findOne({where:{id: accountId, operatorId: req.user.id}})
+				if(user == null ){ 
+					res.statusCode = 404;
+					res.end();
+				} else {
+					const formattedUser = { 
+						id: user.id,
+						stbId: user.uuid,
+						pin: user.pin,
+						status: user.status == 1? "active" : "inactive"
+					}
+					res.json(formattedUser);
+					res.end();
+				}
+			} catch(err) {}
+		}
+		 
+	})
+	
 	// URL FOR OPERATOR API
 	app.post('/authOperator', isOperator, (req, res) => {
 		res.json(req.user);
@@ -212,57 +252,7 @@ module.exports = function(app, passport, env) {
 				res.end();
 			});
 	});
-	app.post('/operatorUpdateUser', isOperator, (req, res) => {
-		if (
-			(!req.body.name ||
-				!req.body.pin ||
-				!req.body.packageId ||
-				!req.body.operatorId ||
-				!req.body.uuid ||
-				!req.body.version || 
-				!req.body.apkUrl ||
-				!req.body.id,
-			req.body.status == 'undefined')
-		) {
-			res.statusCode = 400;
-			res.end();
-		} else {
-			if (req.body.operatorId != req.user.id) {
-				res.statusCode = 403;
-				res.end();
-			} else {
-				const updateUser = {
-					name: req.body.name,
-					status: req.body.status,
-					uuid: req.body.uuid,
-					status: req.body.status,
-					id: req.body.id,
-					version: req.body.version,
-					apkUrl: req.body.apkUrl,
-					packageId: req.body.packageId,
-					operatorId: req.body.operatorId,
-					pin: req.body.pin
-				};
-
-				req.db.users
-					.update(updateUser, {
-						where: { id: updateUser.id, operatorId: req.user.id }
-					})
-					.then(() => {
-						req.db.historyPackages
-							.create({
-								status: updateUser.status,
-								userId: updateUser.id,
-								packageId: updateUser.packageId
-							})
-							.then(r => {
-								res.statusCode = 200;
-								res.end();
-							});
-					});
-			}
-		}
-	});
+	
 	// URL FOR CLIENTS
 	app.get(`/v${process.env.V}/android-app`,async (req, res) => {
 		const stbId = req.query.stbId;
@@ -326,7 +316,10 @@ module.exports = function(app, passport, env) {
 
 				const formattedChannels = channels.map(ch => {
 					let channel = ch.channel;
-
+					let category = {
+						key: categories.find(cat => cat.id == channel.categoryId).key,
+						name: categories.find(cat => cat.id == channel.categoryId).name
+					}
 					let result = {
 						lid: channel.channelId,
 						name:channel.channelName,
@@ -334,7 +327,7 @@ module.exports = function(app, passport, env) {
 						recordingMediaUrl: channel.recordingMediaUrl,
 						recorderHours: channel.timeshift,
 						logoUrl: channel.logoPath,
-						category: categories.find(cat => cat.id == channel.categoryId).key
+						category: category
 					}
 					return result
 				})
@@ -416,7 +409,7 @@ module.exports = function(app, passport, env) {
 			streamPath: req.body.streamPath,
 			timeshift: req.body.timeshift,
 			hidden: req.body.hidden,
-			categoryId: req.body.categoryId
+			categoryId: req.body.categoryId || null
 		};
 		req.db.channels
 			.update(channel, { where: { channelId: channel.channelId } })
@@ -436,7 +429,7 @@ module.exports = function(app, passport, env) {
 			streamPath: req.body.streamPath,
 			timeshift: req.body.timeshift,
 			hidden: req.body.hidden,
-			categoryId: req.body.categoryId
+			categoryId: req.body.categoryId || null
 		};
 		req.db.channels
 			.create(newChannel)
@@ -872,28 +865,26 @@ module.exports = function(app, passport, env) {
 			next();
 		}
 	}
-	function isOperator(req, res, next) {
-		if (!req.body.key) {
-			res.statusCode = 401;
+	async function isOperator(req, res, next) {
+		const operatorKey = req.params.operatorId || req.query.operatorId || req.body.operatorId;
+		if (!operatorKey) {
+			res.statusCode = 403;
 			res.end();
 		} else {
-			req.db.operators
-				.findOne({
-					where: { key: req.body.key }
-				})
-				.then(result => {
-					if (result !== null) {
-						req.user = result;
-						next();
-					} else {
-						res.statusCode = 403;
-						res.end();
-					}
-				})
-				.catch(err => {
-					res.statusCode = 401;
+			try {
+				const operator = await req.db.operators.findOne({where: {key: operatorKey}});
+				if(operator == null) {
+					res.statusCode = 403;
 					res.end();
-				});
+				}
+				req.user = operator;
+				next()
+			} catch(err) {
+				console.error(err);
+				res.statusCode = 409;
+				res.end();
+			}
+			
 		}
 	}
 	function isLoggedIn(req, res, next) {
