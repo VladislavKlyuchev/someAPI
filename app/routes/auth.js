@@ -1,5 +1,6 @@
 var authController = require('../controllers/authcontroller.js');
 const fs = require('fs');
+const axios = require('axios');
 const path = require('path');
 const xmlParser = require('xml2js').parseString;
 const moment = require('moment');
@@ -339,8 +340,17 @@ module.exports = function(app, passport, env) {
 		}
 		
 	});
-	app.get(`/v${process.env.V}/channel/:channelKey/epg`, validSessionId, (req, res) => {
-		res.json([])
+	app.get(`/v${process.env.V}/channel/:channelKey/epg`,  async (req, res) => {
+		const {startDate, endDate} = req.query;
+		const {channelKey} = req.params;
+		if(!startDate, !endDate) {
+			res.statusCode = 400;
+			res.end();
+		} else {
+			const result = await axios.get(`http://192.168.5.194:5000/epg/?key=${channelKey}&startDate=${startDate}&endDate=${endDate}`);
+			res.json(result.data);
+			res.end();
+		}
 	});
 	app.post('/allChannels', isDashboard, (req, res) => {
 		req.db.channels.findAll().then(channels => {
@@ -812,9 +822,11 @@ module.exports = function(app, passport, env) {
 	});
 	async function validSessionId(req, res, next) {
 		const sessionId = req.params.sessionId || req.query.sessionId || req.body.sessionId;
+		console.log('we there!!')
+		console.log(sessionId)
 		if(!sessionId ) {
 			res.statusCode = 401;
-			res.end;
+			res.end();
 		} else {
 			try {
 				let session = await req.db.sessions.findOne({where: { key: sessionId}});
