@@ -313,14 +313,16 @@ module.exports = function(app, passport, env) {
 				order: ['order'],
 				attributes: []
 				})
-				const categories = await req.db.category.findAll();
-
+				let categories = await req.db.category.findAll();
+				if(categories == null ) {
+					categories = [];
+				}
+				const formattedCategories = categories.map(cat => {
+					return { key: cat.key, name: cat.name }
+				})
 				const formattedChannels = channels.map(ch => {
 					let channel = ch.channel;
-					let category = {
-						key: categories.find(cat => cat.id == channel.categoryId).key,
-						name: categories.find(cat => cat.id == channel.categoryId).name
-					}
+
 					let result = {
 						lid: channel.channelId,
 						name:channel.channelName,
@@ -328,11 +330,15 @@ module.exports = function(app, passport, env) {
 						recordingMediaUrl: channel.recordingMediaUrl,
 						recorderHours: channel.timeshift,
 						logoUrl: channel.logoPath,
-						category: category
+						category: [categories.find(cat => cat.id == channel.categoryId).key] || []
 					}
 					return result
 				})
-				res.json(formattedChannels);
+				let result = {
+					categories: formattedCategories,
+					channels: formattedChannels
+				}
+				res.json(result);
 				res.end();
 			} catch(err) {
 				console.log(err)
@@ -788,6 +794,7 @@ module.exports = function(app, passport, env) {
 	app.post(`/v${process.env.V}/session`, async (req, res ) => {
 		const stbId = req.body.stbId;
 		if(!stbId) {
+			console.log(stbId)
 			res.statusCode = 400;
 			res.end()
 		} else {
