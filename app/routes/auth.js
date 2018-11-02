@@ -69,8 +69,8 @@ module.exports = function(app, passport, env) {
 					const newUser = await req.db.users.create(user);
 					await updateUserHistory(req.db.historyPackages, newUser);
 					const result = newUser.get('id');
-					res.json({accountId: result});
 					res.statusCode = 201;
+					res.json({accountId: result});
 					res.end()
 				}
 			} catch(err) {
