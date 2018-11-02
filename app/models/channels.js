@@ -15,7 +15,7 @@ module.exports = function (sequelize, Sequelize) {
 
 	});
 	Channels.associate = function (models) {
-		models.channels.hasMany(models.chPackages, {onDelete: 'cascade'})
+		 models.channels.hasMany(models.chPackages)
 	}
 	return Channels;
 

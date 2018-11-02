@@ -70,6 +70,7 @@ module.exports = function(app, passport, env) {
 					await updateUserHistory(req.db.historyPackages, newUser);
 					const result = newUser.get('id');
 					res.json({accountId: result});
+					res.statusCode = 201;
 					res.end()
 				}
 			} catch(err) {
@@ -383,9 +384,9 @@ module.exports = function(app, passport, env) {
 					res.statusCode = 200;
 					const channelsWithPackage = result.map(el => {
 						return {
-							packageId: el.packageId,
+							packageId: el.packageId || null,
 							order: el.order,
-							id: el.channel.id,
+							id: el.channel.id || null,
 							channelId: el.channel.channelId,
 							channelName: el.channel.channelName,
 							channelNameEn: el.channel.channelNameEn,
@@ -405,13 +406,21 @@ module.exports = function(app, passport, env) {
 				});
 		});
 	});
-	app.post('/deleteChannel', isDashboard, (req, res) => {
-		req.db.channels
-			.destroy({ where: { channelId: req.body.channelId } })
-			.then(ok => {
+	app.post('/deleteChannel', isDashboard,  (req, res) => {
+		req.db.chPackages.destroy({where: {channelId: req.body.id}})
+		
+		.then(() => {
+			req.db.channels.destroy({where: {id: req.body.id }})
+			.then(() => {
+
 				res.statusCode = 200;
 				res.end();
-			});
+			})
+		})
+		.catch(err => {
+			console.error(err)
+		})
+		
 	});
 	app.post('/updateChannel', isDashboard, (req, res) => {
 		const channel = {
@@ -531,6 +540,33 @@ module.exports = function(app, passport, env) {
 			res.end();
 		});
 	});
+	app.post('/deleteCategories', isDashboard, async (req,res ) => {
+		console.log(req.body)
+		if(!req.body.id && req.body.id != 0 ) {
+			res.end();
+		}
+		try {
+			await req.db.category.destroy({where: {id: req.body.id}})
+			res.end();
+		} catch (error) {
+			console.error(error)
+		}
+	})
+	app.post('/editCategories', isDashboard, async (req,res ) => {
+		if(!req.body.id && req.body.id != 0 ) {
+			res.end();
+		}
+		const updateCategory = {
+			key: req.body.key,
+			name: req.body.name
+		}
+		try {
+			await req.db.category.update(updateCategory, {where: {id: req.body.id}})
+			res.end();
+		} catch (error) {
+			console.error(error)
+		}
+	})
 	app.post('/addNewCategory', isDashboard, (req, res) => {
 		if (!req.body.name || !req.body.key) {
 			res.statusCode = 400;
