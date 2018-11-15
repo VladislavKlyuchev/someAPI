@@ -84,11 +84,10 @@ module.exports = function(app, passport, env) {
 		
 		}
 	});
-	console.log(`billing-api/v${process.env.B}/:operatorId/account/:accountId`)
 	app.put(`/billing-api/v${process.env.B}/:operatorId/account/:accountId`, isOperator, async (req, res) => {
 		const {status, stbId, packageId} =  req.body;
 		const accountId = req.params.accountId
-		console.log('accountId', accountId)
+
 		if (!status || !stbId || !packageId) {
 			res.statusCode = 400;
 			res.end();
@@ -236,6 +235,30 @@ module.exports = function(app, passport, env) {
 		}
 		 
 	})
+	// переделать позже
+	app.post('/userHistory', isOperator, (req, res) => {
+		req.db.users.findAll({ where: { operatorId: req.user.id } }).then(users => {
+			const usersId = users.map(el => el.id);
+			req.db.historyPackages
+				.findAll({
+					where: { userId: usersId }
+				})
+				.then(history => {
+					const formatterHistory = history.map((h, i, arr) => {
+						const endTime = arr[i + 1] ? arr[i + 1].updatedAt : new Date();
+						return {
+							userId: h.userId,
+							createdAt: moment(h.createdAt).format('YYYY-MM-DD HH:mm'),
+							updatedAt: moment(endTime).format('YYYY-MM-DD HH:mm'),
+							status: h.status,
+							packageId: h.packageId
+						};
+					});
+					res.json(formatterHistory);
+					res.end();
+				});
+		});
+	});
 	
 	// URL FOR OPERATOR API
 	app.post('/authOperator', isOperator, (req, res) => {
