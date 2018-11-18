@@ -28,6 +28,59 @@ module.exports = function(app, passport, env) {
 	app.get(`/billing-api/v${process.env.B}/:operatorId/package`, isOperator, async (req, res) => {
 		try {
 			const packages = await req.db.packages.findAll({where: {operatorId: req.user.id, status: 1}})
+			const categories = await req.db.category.findAll();
+			const chPackages = await req.db.chPackages.findAll({where: {packageId: packages.map(el => el.id)}, include: [
+				{
+					model: req.db.channels,
+					attributes: [
+						'id',
+						'channelId',
+						'channelName',
+						'channelNameEn',
+						'xmlTvId',
+						'logoPath',
+						'streamPath',
+						'hidden',
+						'categoryId'
+					]
+				}
+			]})
+			
+			const channels = chPackages.map(el => {
+				return {
+					packageId: el.packageId,
+					key: el.channel.channelNameEn,
+					lid: el.channel.channelId,
+						name:el.channel.channelName,
+						mediaUrl: el.channel.streamPath,
+						recordingMediaUrl: el.channel.recordingMediaUrl,
+						recorderHours: el.channel.timeshift,
+						logoUrl: el.channel.logoPath,
+						category: [categories.find(cat => cat.id == el.channel.categoryId).name, categories.find(cat => cat.id == el.channel.categoryId).key] || []
+				}
+			})
+			const formattedResponse = packages.map(el => {
+				return {
+					id: el.id,
+					name: el.name,
+					price: el.price,
+					channels: channels.filter(sub => el.id == sub.packageId).map(sub => {
+						return {
+							key:sub.key,
+					lid: sub.lid,
+						name:sub.name,
+						mediaUrl: sub.mediaUrl,
+						recordingMediaUrl: sub.recordingMediaUrl,
+						recorderHours: sub.recorderHours,
+						logoUrl: sub.logoUrl,
+						category: sub.category
+						}
+					})
+				}
+			})
+			res.json(formattedResponse)
+			res.end()
+			/*
 			if(packages == null ) {
 				res.json([])
 				res.end();
@@ -41,7 +94,8 @@ module.exports = function(app, passport, env) {
 				})
 				res.json(formattedPackages)
 				res.end()
-			}
+				
+			}*/
 		} catch(err) {
 			console.error(err)
 			res.statusCode = 409;
@@ -135,6 +189,7 @@ module.exports = function(app, passport, env) {
 							id: u.id,
 							stbId: u.uuid,
 							pin: u.pin,
+							packageId: u.packageId,
 							status: u.status == 1? "active" : "inactive"
 						}
 					})
@@ -226,6 +281,7 @@ module.exports = function(app, passport, env) {
 						id: user.id,
 						stbId: user.uuid,
 						pin: user.pin,
+						packageId: user.packageId,
 						status: user.status == 1? "active" : "inactive"
 					}
 					res.json(formattedUser);
