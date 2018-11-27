@@ -942,6 +942,44 @@ module.exports = function(app, passport, env) {
 			}
 		}
 	});
+	app.post('/createAccount', isOperator, async (req, res) => {
+		if (!req.body.packageId) {
+			res.statusCode = 400;
+			res.end();
+		} else {
+			const user = {
+				uuid: req.body.uuid || null,
+				pin: req.body.pin || null,
+				name: req.body.name || null,
+				status: req.body.status || false,
+				version: req.body.version || null,
+				apkUrl: req.body.apkUrl || null,
+				packageId: req.body.packageId,
+				operatorId: req.user.id
+			};
+			try {
+				const packageId = req.body.packageId
+				const package = await req.db.packages.findOne({where: {operatorId: req.user.id, id: packageId}});
+				if(package == null) {
+					res.statusCode = 403;
+					res.end();
+				}  else {
+	
+					const newUser = await req.db.users.create(user);
+					await updateUserHistory(req.db.historyPackages, newUser);
+					const result = newUser.get('id');
+					res.json({accountId: result});
+					res.end()
+				}
+			} catch(err) {
+				console.log(err)
+				res.statusCode = 409;
+				res.end();
+			}
+		}
+	})
+		
+			
 	async function validSessionId(req, res, next) {
 		const sessionId = req.params.sessionId || req.query.sessionId || req.body.sessionId;
 		console.log('we there!!')
@@ -1010,9 +1048,10 @@ module.exports = function(app, passport, env) {
 				if(operator == null) {
 					res.statusCode = 403;
 					res.end();
-				}
+				} else { 
 				req.user = operator;
 				next()
+				}
 			} catch(err) {
 				console.error(err);
 				res.statusCode = 409;
