@@ -952,7 +952,6 @@ module.exports = function(app, passport, env) {
 			(!req.body.name ||
 				!req.body.pin ||
 				!req.body.packageId ||
-				!req.body.operatorId ||
 				!req.body.uuid ||
 				!req.body.version || 
 				!req.body.apkUrl ||
@@ -975,7 +974,6 @@ module.exports = function(app, passport, env) {
 					version: req.body.version,
 					apkUrl: req.body.apkUrl,
 					packageId: req.body.packageId,
-					operatorId: req.body.operatorId,
 					pin: req.body.pin
 				};
 
@@ -983,7 +981,7 @@ module.exports = function(app, passport, env) {
 					.update(updateUser, {
 						where: { id: updateUser.id, operatorId: req.user.id }
 					})
-					await updateUserHistory(req.db.historyPackages,updateUser )
+					await updateUserHistory(req.db.historyPackages, updateUser )
 					res.statusCode = 200;
 					res.end();
 			}
