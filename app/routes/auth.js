@@ -962,7 +962,7 @@ module.exports = function(app, passport, env) {
 			res.statusCode = 400;
 			res.end();
 		} else {
-			if (req.body.operatorId != req.user.id) {
+			if (req.body.operatorId != req.user.key) {
 				res.statusCode = 403;
 				res.end();
 			} else {
