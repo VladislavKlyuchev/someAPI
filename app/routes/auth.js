@@ -6,6 +6,7 @@ const xmlParser = require('xml2js').parseString;
 const moment = require('moment');
 
 async function updateUserHistory(db, user) {
+	
 	try {
 		const formatted = {
 			status: user.status,
@@ -979,7 +980,48 @@ module.exports = function(app, passport, env) {
 		}
 	})
 		
-			
+	app.post('/operatorUpdateUser', isOperator, async (req, res) => {
+		if (
+			(!req.body.name ||
+				!req.body.pin ||
+				!req.body.packageId ||
+				!req.body.operatorId ||
+				!req.body.uuid ||
+				!req.body.version || 
+				!req.body.apkUrl ||
+				!req.body.id,
+			req.body.status == 'undefined')
+		) {
+			res.statusCode = 400;
+			res.end();
+		} else {
+			if (req.body.operatorId != req.user.id) {
+				res.statusCode = 403;
+				res.end();
+			} else {
+				const updateUser = {
+					name: req.body.name,
+					status: req.body.status,
+					uuid: req.body.uuid,
+					status: req.body.status,
+					id: req.body.id,
+					version: req.body.version,
+					apkUrl: req.body.apkUrl,
+					packageId: req.body.packageId,
+					operatorId: req.body.operatorId,
+					pin: req.body.pin
+				};
+
+				await req.db.users
+					.update(updateUser, {
+						where: { id: updateUser.id, operatorId: req.user.id }
+					})
+					await updateUserHistory(req.db.historyPackages,updateUser )
+					res.statusCode = 200;
+					res.end();
+			}
+		}
+	});		
 	async function validSessionId(req, res, next) {
 		const sessionId = req.params.sessionId || req.query.sessionId || req.body.sessionId;
 		console.log('we there!!')
