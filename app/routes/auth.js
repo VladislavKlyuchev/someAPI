@@ -849,51 +849,18 @@ module.exports = function(app, passport, env) {
 			res.end();
 		});
 	});
-	app.post('/updatePackage', isDashboard, (req, res) => {
+	app.post('/updatePackage', isDashboard, async (req, res) => {
 		if (!req.body.packageId || !req.body.price || !req.body.name) {
 			res.statusCode = 400;
 			res.end();
 		} else {
 			const package = {
-				id: req.body.packageId,
 				price: req.body.price,
-				name: req.body.name,
-				status: req.body.status
+				name: req.body.name
 			};
-			req.db.packages
-				.update(package, {
-					where: { id: req.body.packageId }
-				})
-				.then(() => {
-					req.db.packages.findAll().then(packages => {
-						req.db.users.findAll({ where: { packageId: null } }).then(users => {
-							const newUsers = users.map(el => {
-								let body = {
-									id: el.id,
-									name: el.name,
-									uuid: el.uuid,
-									pin: el.pin,
-									status: el.status,
-									operatorId: el.operatorId,
-									packageId: packages.find(p => el.operatorId == p.operatorId)
-										.id
-								};
-								return body;
-							});
-							req.db.users
-								.bulkCreate(newUsers, {
-									updateOnDuplicate: ['packageId']
-								})
-								.then(g => {
-									const history = newUsers.map(el => {
-										return {};
-									});
-									req.db.historyPackages.bulkCreate();
-									res.end();
-								});
-						});
-					});
-				});
+			
+			await req.db.packages.update(package, {where: {id: req.body.packageId}})
+			res.end();
 		}
 	});
 	app.get('/dashboard', isLoggedIn, authController.dashboard);
