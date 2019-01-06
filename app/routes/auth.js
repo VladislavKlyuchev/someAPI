@@ -119,7 +119,7 @@ module.exports = function(app, passport, env) {
     `/billing-api/v${process.env.B}/:operatorId/account`,
     isOperator,
     async (req, res) => {
-      if (!req.body.packageId) {
+      if (!req.body.packageId || !req.body.pin || !req.body.name) {
         res.statusCode = 400;
         res.end();
       } else {
@@ -134,6 +134,8 @@ module.exports = function(app, passport, env) {
           } else {
             const user = {
               packageId: req.body.packageId,
+              pin: req.body.pin,
+              name: req.body.name,
               operatorId: req.user.id
             };
             const newUser = await req.db.users.create(user);
@@ -155,10 +157,10 @@ module.exports = function(app, passport, env) {
     `/billing-api/v${process.env.B}/:operatorId/account/:accountId`,
     isOperator,
     async (req, res) => {
-      const { status, stbId, packageId } = req.body;
+      const { status, stbId, packageId, pin, name } = req.body;
       const accountId = req.params.accountId;
 
-      if (!status || !stbId || !packageId) {
+      if (!status || !stbId || !packageId || !pin || !name) {
         res.statusCode = 400;
         res.end();
       } else {
@@ -173,6 +175,8 @@ module.exports = function(app, passport, env) {
             const update = await req.db.users.update(
               {
                 uuid: stbId,
+                name: name,
+                pin: pin,
                 packageId: packageId,
                 status: status == "active" ? 1 : 0
               },
@@ -220,6 +224,7 @@ module.exports = function(app, passport, env) {
                 id: u.id,
                 stbId: u.uuid,
                 pin: u.pin,
+                name: u.name,
                 packageId: u.packageId,
                 status: u.status == 1 ? "active" : "inactive"
               };
@@ -334,6 +339,7 @@ module.exports = function(app, passport, env) {
               id: user.id,
               stbId: user.uuid,
               pin: user.pin,
+              name: user.name,
               packageId: user.packageId,
               status: user.status == 1 ? "active" : "inactive"
             };
@@ -360,6 +366,7 @@ module.exports = function(app, passport, env) {
               createdAt: moment(h.createdAt).format("YYYY-MM-DD HH:mm"),
               updatedAt: moment(endTime).format("YYYY-MM-DD HH:mm"),
               status: h.status,
+              name: h.name,
               packageId: h.packageId
             };
           });
