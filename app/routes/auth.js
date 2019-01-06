@@ -303,6 +303,7 @@ module.exports = function(app, passport, env) {
               date: h.createdAt,
               status: h.status == 1 ? "active" : "inactive",
               packageId: h.packageId,
+              name: h.name,
               stbId: users.find(u => h.userId !== null && u.id == h.userId).uuid
             };
           });
